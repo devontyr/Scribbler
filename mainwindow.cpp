@@ -1,9 +1,10 @@
 #include "mainwindow.h"
 #include <QtWidgets>
 #include "scribbler.h"
+#include <math.h>
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), tabNum(0) {
+    : QMainWindow(parent) {
 
     setWindowTitle("Scribbler");
 
@@ -11,10 +12,10 @@ MainWindow::MainWindow(QWidget *parent)
     setCentralWidget(central);
     QHBoxLayout *mainLayout = new QHBoxLayout(central);
 
-    Scribbler *scribbler = new Scribbler;
-    mainLayout->addWidget(scribbler, 0, Qt::AlignHCenter);
+    scribbler = new Scribbler;
+    mainLayout->addWidget(scribbler, 1);
     tabs = new QTabWidget;
-    mainLayout->addWidget(tabs, 3, Qt::AlignHCenter);
+    mainLayout->addWidget(tabs, 1);
     tabs->setVisible(false); //initially hidden
 
 
@@ -37,7 +38,6 @@ MainWindow::MainWindow(QWidget *parent)
     fileMenu->addAction(resetAct);
     fileMenu->addAction(saveFileAct);
     menuBar()->addMenu(fileMenu);
-
 
     QAction *startCaptureAct = new QAction("Start Capture");
     connect(startCaptureAct, &QAction::triggered, scribbler, &Scribbler::startCaptureSlot);
@@ -79,31 +79,45 @@ MainWindow::~MainWindow() {
     settings.value("lastDirectory", lastDir);
 }
 
-void MainWindow::displayCaptureSlot(QList<MouseEvent> events) {
-    // stores data from QList<MouseEvent>
+void MainWindow::createTab(int captureNum) {
+    QList<MouseEvent> &events = importedEvents[captureNum]; //prevents from being copied
 
     // adds a tab to tabs with a QTableWidget with a row for each MouseEvent
-    int nRows = events.size(); int nCols = 3;
+    int nRows = events.size(); int nCols = 4;
     QTableWidget *currDataTable = new QTableWidget(nRows, nCols);
-    currDataTable->setHorizontalHeaderLabels(QStringList() << "Action Type" << "Position" << "Time");
-    tabs->addTab(currDataTable, QString::number(tabNum));
-    ++tabNum;
+    currDataTable->setHorizontalHeaderLabels(QStringList() << "Action Type" << "Position" << "Time" << "Points Dist");
+    tabs->addTab(currDataTable, QString::number(captureNum));
 
     //load data into the rows
     for (int iRow = 0; iRow < nRows; ++iRow) {
         QString action = "";
-        if (events[iRow].action == 0) action = "Press";
-        if (events[iRow].action == 1) action = "Move";
-        if (events[iRow].action == 2) action = "Release";
+        MouseEvent &evt = events[iRow];
+
+        if (evt.action == 0) action = "Press";
+        if (evt.action == 1) action = "Move";
+        if (evt.action == 2) action = "Release";
+
         QTableWidgetItem *actionItem = new QTableWidgetItem(action);
         currDataTable->setItem(iRow, 0, actionItem);
 
-        QTableWidgetItem *posItem = new QTableWidgetItem(QString("(%1, %2)").arg(events[iRow].pos.x()).arg(events[iRow].pos.y()));
+        QTableWidgetItem *posItem = new QTableWidgetItem(QString("(%1, %2)").arg(evt.pos.x()).arg(evt.pos.y()));
         currDataTable->setItem(iRow, 1, posItem);
 
-        QTableWidgetItem *timeItem = new QTableWidgetItem(QString::number(events[iRow].time));
+        QTableWidgetItem *timeItem = new QTableWidgetItem(QString::number(evt.time));
         currDataTable->setItem(iRow, 2, timeItem);
+
+        if (iRow > 0 & evt.action != 0) {
+            QTableWidgetItem *distanceItem = new QTableWidgetItem(QString("%1").arg(QLineF(evt.pos, events[iRow-1].pos).length()));
+            currDataTable->setItem(iRow, 3, distanceItem);
+        }
     }
+}
+
+void MainWindow::displayCaptureSlot(QList<MouseEvent> events) {
+    importedEvents << events;
+
+    int lastElement = importedEvents.size()-1;
+    createTab(lastElement);
 
     tabs->setVisible(true);
 }
@@ -126,10 +140,7 @@ void MainWindow::saveFileSlot() {
     lastDir = QFileInfo(outFile).absolutePath();
 
     QDataStream out(&outFile);
-    out << "x";
-
-    //TODO: save all the data in the tabs (including tab names) to a binary file
-
+    out << importedEvents;
 }
 
 void MainWindow::openFileSlot() {
@@ -146,8 +157,22 @@ void MainWindow::openFileSlot() {
     lastDir = QFileInfo(inFile).absolutePath();
 
     QDataStream in(&inFile);
-    QList<MouseEvent> importedEvents;
     in >> importedEvents;
 
-    //TODO: with this data, need to: draw the scribbler, load the tabs & tables
+    for (int iTab=0; iTab<importedEvents.size(); ++iTab) {
+        createTab(iTab);
+        scribbler->drawMouseEvents(importedEvents[iTab]);
+    }
 }
+
+// store a pointer to a line and dot (null if not used)
+// when you draw, in the mouseevent record the dot and line
+// then main window has pointers and can change opacity
+
+// store in seperate lists, the graphicsitems of dots and lines
+// capturedDots // capturedLines -- qL<qL<GItems>
+// master of all drawn lines and dots (pointers)
+
+// each qList is for each tab -- highlight wanted one
+
+//

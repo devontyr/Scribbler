@@ -8,9 +8,16 @@
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
+
+    Scribbler *scribbler;
+
     QString lastDir;
     QTabWidget *tabs;
-    int tabNum;
+
+    QList<QList<MouseEvent>> importedEvents;
+
+    void createTab(int captureNum);
+    void pointsDistance(QPointF p1, QPointF p2);
 
 public:
     MainWindow(QWidget *parent = nullptr);

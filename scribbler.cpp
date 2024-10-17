@@ -20,21 +20,47 @@ Scribbler::Scribbler()
     setScene(&scene); //widgets on the heap. pointers init with new. takes a pointer to the scene
 
     setSceneRect(QRectF(0.0, 0.0, 800.0, 600.0));
-    setMinimumSize(QSize(800, 600));
+    //setMinimumSize(QSize(800, 600));
     setRenderHint(QPainter::Antialiasing, true);
-    setBackgroundBrush(Qt::lightGray);
+    setBackgroundBrush(Qt::white);
 
     scene.addRect(sceneRect()); //for debugging
+}
+
+void Scribbler::addPoint(QPointF point) {
+    dot = scene.addEllipse(QRectF(point - QPointF(0.5*lineWidth, 0.5*lineWidth), QSizeF(lineWidth, lineWidth)), Qt::NoPen, Qt::black);
+}
+
+void Scribbler::addLineSegement(QPointF point1, QPointF point2) {
+    line = scene.addLine(QLineF(point1, point2), QPen(Qt::black, lineWidth, Qt::SolidLine, Qt::FlatCap));
+}
+
+void Scribbler::drawMouseEvents(QList<MouseEvent> &events) {
+    QPointF lastP; //keep its own last point
+
+    for (int iEvt=0; iEvt<events.size(); ++iEvt) {
+        QPointF p = events[iEvt].pos;
+        int evtAction = events[iEvt].action;
+        if (evtAction == 0) {
+            addPoint(p);
+            lastP = p;
+        }
+        if (evtAction == 1) {
+            addLineSegement(lastP, p);
+            addPoint(p);
+            lastP = p;
+        }
+    }
 }
 
 void Scribbler::mousePressEvent(QMouseEvent *evt) {
     QGraphicsView::mousePressEvent(evt); // need to load previous abilites too... those that we didn't override
 
     QPointF p = mapToScene(evt->pos()); //evt pos is in widget coords (QPoint)... we want SCENE coords (QPointF)
-    lastPoint = p;
-    QGraphicsEllipseItem *dot = scene.addEllipse(QRectF(p - QPointF(0.5*lineWidth, 0.5*lineWidth), QSizeF(lineWidth, lineWidth)), Qt::NoPen, Qt::black);
+    addPoint(p);
+    lastPoint = p; //is it bad this is after addPoint?
 
-    //record event
+    //record events
     dots << dot;
     events << MouseEvent(MouseEvent::Press, p, evt->timestamp());
 }
@@ -43,11 +69,12 @@ void Scribbler::mouseMoveEvent(QMouseEvent *evt) {
     QGraphicsView::mouseMoveEvent(evt);
 
     QPointF p = mapToScene(evt->pos());
-    QGraphicsLineItem *line = scene.addLine(QLineF(lastPoint, p), QPen(Qt::black, lineWidth, Qt::SolidLine, Qt::FlatCap));
-    QGraphicsEllipseItem *dot = scene.addEllipse(QRectF(p - QPointF(0.5*lineWidth, 0.5*lineWidth), QSizeF(lineWidth, lineWidth)), Qt::NoPen, Qt::black);
+    addLineSegement(lastPoint, p);
+    addPoint(p);
     lastPoint = p;
     line->setVisible(isLineVisible);
 
+    //record events
     dots << dot;
     lines << line;
     events << MouseEvent(MouseEvent::Move, p, evt->timestamp());
@@ -84,8 +111,10 @@ void Scribbler::startCaptureSlot() {
 }
 
 void Scribbler::endCaptureSlot() {
-    //emit signal with the data out to MainWindow
-    emit sendCapture(events);
+    //loop through events and make a qlist of graphicspointers.. when sent out (emit) take all graphics items and create a group
+
+    //groups qlist of that ^, then can set opacity of that group
+    emit sendCapture(events); //emit signal with the data out to MainWindow
     events.clear();
 }
 

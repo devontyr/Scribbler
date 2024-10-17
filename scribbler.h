@@ -35,14 +35,22 @@ class Scribbler : public QGraphicsView
     QPointF lastPoint;
     bool isLineVisible;
 
+    QGraphicsEllipseItem *dot;
+    QGraphicsLineItem *line;
+
     QList<MouseEvent> events;
     QList<QGraphicsLineItem *> lines;
     QList<QGraphicsEllipseItem *> dots;
 
+    void addPoint(QPointF point);
+    void addLineSegement(QPointF point1, QPointF point2);
+
 
     Q_OBJECT
+
 public:
     Scribbler();
+    void drawMouseEvents(QList<MouseEvent> &events);
 
 public slots:
     void showDotsOnlySlot();

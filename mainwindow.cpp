@@ -25,7 +25,6 @@ MainWindow::MainWindow(QWidget *parent)
     openFileAct->setShortcut(Qt::CTRL | Qt::Key_O); //slot triggered with ctrl O key
 
     QAction *resetAct = new QAction("Reset Scribble");
-    connect(resetAct, &QAction::triggered, scribbler, &Scribbler::resetDrawingSlot);
     connect(resetAct, &QAction::triggered, this, &MainWindow::resetSlot);
     resetAct->setShortcut(Qt::CTRL | Qt::Key_R); //slot triggered with ctrl R
 
@@ -68,6 +67,7 @@ MainWindow::MainWindow(QWidget *parent)
     viewMenu->addAction(dotsOnlyAct);
     menuBar()->addMenu(viewMenu);
 
+    connect(tabs, &QTabWidget::currentChanged, this, &MainWindow::fadeTabSlot);
 
     //Save Last Directory
     QSettings settings("DRT", "scribbler");
@@ -111,6 +111,43 @@ void MainWindow::createTab(int captureNum) {
             currDataTable->setItem(iRow, 3, distanceItem);
         }
     }
+
+    connect(currDataTable, &QTableWidget::currentCellChanged, this, &MainWindow::highlightRowsSlot);
+}
+
+void MainWindow::clearColors() {
+    //loop through all events to turn black
+    for (int iLine = 0; iLine < highlightedLines.size(); ++iLine) {
+        highlightedLines[iLine]->setPen(QPen(Qt::black, 4.0, Qt::SolidLine, Qt::FlatCap));
+    }
+    for (int iDot = 0; iDot < highlightedDots.size(); ++iDot) {
+        highlightedDots[iDot]->setBrush(QBrush(Qt::black));
+    }
+}
+
+void MainWindow::highlightRowsSlot() {
+    clearColors();
+    int selectedTab = tabs->currentIndex();
+    QTableWidget* curTable = (QTableWidget*) tabs->currentWidget();
+    QList<QTableWidgetSelectionRange> range = curTable->selectedRanges();
+    //loop through each rectangle and do a top to bottom
+    for (int iList = 0; iList < range.size(); ++iList) {
+        int topRow = range[iList].topRow();
+        int bottomRow = range[iList].bottomRow();
+        //for each selection range, loop through selected items in the table
+        for (int iRow = topRow; iRow < bottomRow; ++iRow) {
+            //use X row to index into the QList<MouseEvent>
+            if (importedEvents[selectedTab][iRow].dot) {
+                importedEvents[selectedTab][iRow].dot->setBrush(QBrush(Qt::red));
+                highlightedDots.append(importedEvents[selectedTab][iRow].dot);
+            }
+
+            if (importedEvents[selectedTab][iRow].line) {
+                importedEvents[selectedTab][iRow].line->setPen(QPen(Qt::red, 4.0, Qt::SolidLine, Qt::FlatCap));
+                highlightedLines.append(importedEvents[selectedTab][iRow].line);
+            }
+        }
+    }
 }
 
 void MainWindow::displayCaptureSlot(QList<MouseEvent> events) {
@@ -125,6 +162,15 @@ void MainWindow::displayCaptureSlot(QList<MouseEvent> events) {
 void MainWindow::resetSlot() {
     tabs->clear();
     tabs->setVisible(false);
+    importedEvents.clear();
+    highlightedDots.clear();
+    highlightedLines.clear();
+    scribbler->resetDrawingSlot();
+}
+
+void MainWindow::fadeTabSlot() {
+    scribbler->fadeTab(tabs->currentIndex());
+    clearColors();
 }
 
 void MainWindow::saveFileSlot() {
@@ -164,15 +210,3 @@ void MainWindow::openFileSlot() {
         scribbler->drawMouseEvents(importedEvents[iTab]);
     }
 }
-
-// store a pointer to a line and dot (null if not used)
-// when you draw, in the mouseevent record the dot and line
-// then main window has pointers and can change opacity
-
-// store in seperate lists, the graphicsitems of dots and lines
-// capturedDots // capturedLines -- qL<qL<GItems>
-// master of all drawn lines and dots (pointers)
-
-// each qList is for each tab -- highlight wanted one
-
-//

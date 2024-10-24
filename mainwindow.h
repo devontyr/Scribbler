@@ -14,10 +14,14 @@ class MainWindow : public QMainWindow
     QString lastDir;
     QTabWidget *tabs;
 
+    QList<QGraphicsEllipseItem*> highlightedDots;
+    QList<QGraphicsLineItem*> highlightedLines;
+
     QList<QList<MouseEvent>> importedEvents;
 
     void createTab(int captureNum);
     void pointsDistance(QPointF p1, QPointF p2);
+    void clearColors();
 
 public:
     MainWindow(QWidget *parent = nullptr);
@@ -28,6 +32,8 @@ public slots:
     void resetSlot();
     void saveFileSlot();
     void openFileSlot();
+    void highlightRowsSlot();
+    void fadeTabSlot();
 };
 
 #endif // MAINWINDOW_H

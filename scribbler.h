@@ -15,17 +15,16 @@ public:
     int action;
     QPointF pos;
     quint64 time;
+    QGraphicsEllipseItem *dot;
+    QGraphicsLineItem *line;
 
     //constructor:
-    MouseEvent(int _action, QPointF _pos, quint64 _time);
+    MouseEvent(int _action, QPointF _pos, quint64 _time, QGraphicsEllipseItem* _dot, QGraphicsLineItem* _line);
     MouseEvent();
 
     //output methods to files (<< for input methods)
     friend QDataStream &operator<<(QDataStream &out, const MouseEvent &evt);
     friend QDataStream &operator>>(QDataStream &in, MouseEvent &evt);
-
-    // output method for qDebugging:
-    // friend QTextStream &operator<<(QTextStream &out, const MouseEvent &evt);
 };
 
 class Scribbler : public QGraphicsView
@@ -35,15 +34,20 @@ class Scribbler : public QGraphicsView
     QPointF lastPoint;
     bool isLineVisible;
 
-    QGraphicsEllipseItem *dot;
-    QGraphicsLineItem *line;
-
     QList<MouseEvent> events;
+    QList<QGraphicsLineItem *> drawnLines;
+    QList<QGraphicsEllipseItem *> drawnDots;
+
     QList<QGraphicsLineItem *> lines;
     QList<QGraphicsEllipseItem *> dots;
 
-    void addPoint(QPointF point);
-    void addLineSegement(QPointF point1, QPointF point2);
+    QList<QList<QGraphicsLineItem *>> capturedLines;
+    QList<QList<QGraphicsEllipseItem *>> capturedDots;
+
+    QGraphicsEllipseItem * addPoint(QPointF point);
+    QGraphicsLineItem * addLineSegement(QPointF point1, QPointF point2);
+
+    void showLines (bool areLinesShown);
 
 
     Q_OBJECT
@@ -51,6 +55,7 @@ class Scribbler : public QGraphicsView
 public:
     Scribbler();
     void drawMouseEvents(QList<MouseEvent> &events);
+    void fadeTab(int selectedTab);
 
 public slots:
     void showDotsOnlySlot();

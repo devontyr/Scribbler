@@ -1,8 +1,9 @@
 #include "scribbler.h"
 #include <QtWidgets>
+#include <mainwindow.h>
 
-MouseEvent::MouseEvent(int _action, QPointF _pos, quint64 _time) //just a data storage class
-    :action(_action), pos(_pos), time(_time) {}
+MouseEvent::MouseEvent(int _action, QPointF _pos, quint64 _time, QGraphicsEllipseItem* _dot, QGraphicsLineItem* _line) //just a data storage class
+    :action(_action), pos(_pos), time(_time), dot(_dot), line(_line) {}
 
 QDataStream &operator<<(QDataStream &out, const MouseEvent &evt) {
     return out << evt.action << evt.pos << evt.time;
@@ -27,12 +28,12 @@ Scribbler::Scribbler()
     scene.addRect(sceneRect()); //for debugging
 }
 
-void Scribbler::addPoint(QPointF point) {
-    dot = scene.addEllipse(QRectF(point - QPointF(0.5*lineWidth, 0.5*lineWidth), QSizeF(lineWidth, lineWidth)), Qt::NoPen, Qt::black);
+QGraphicsEllipseItem * Scribbler::addPoint(QPointF point) {
+    return scene.addEllipse(QRectF(point - QPointF(0.5*lineWidth, 0.5*lineWidth), QSizeF(lineWidth, lineWidth)), Qt::NoPen, Qt::black);
 }
 
-void Scribbler::addLineSegement(QPointF point1, QPointF point2) {
-    line = scene.addLine(QLineF(point1, point2), QPen(Qt::black, lineWidth, Qt::SolidLine, Qt::FlatCap));
+QGraphicsLineItem * Scribbler::addLineSegement(QPointF point1, QPointF point2) {
+    return scene.addLine(QLineF(point1, point2), QPen(Qt::black, lineWidth, Qt::SolidLine, Qt::FlatCap));
 }
 
 void Scribbler::drawMouseEvents(QList<MouseEvent> &events) {
@@ -57,27 +58,30 @@ void Scribbler::mousePressEvent(QMouseEvent *evt) {
     QGraphicsView::mousePressEvent(evt); // need to load previous abilites too... those that we didn't override
 
     QPointF p = mapToScene(evt->pos()); //evt pos is in widget coords (QPoint)... we want SCENE coords (QPointF)
-    addPoint(p);
+    QGraphicsEllipseItem* dot = addPoint(p);
     lastPoint = p; //is it bad this is after addPoint?
 
     //record events
+    drawnDots << dot;
     dots << dot;
-    events << MouseEvent(MouseEvent::Press, p, evt->timestamp());
+    events << MouseEvent(MouseEvent::Press, p, evt->timestamp(), dot, NULL);
 }
 
 void Scribbler::mouseMoveEvent(QMouseEvent *evt) {
     QGraphicsView::mouseMoveEvent(evt);
 
     QPointF p = mapToScene(evt->pos());
-    addLineSegement(lastPoint, p);
-    addPoint(p);
+    QGraphicsLineItem* line = addLineSegement(lastPoint, p);
+    QGraphicsEllipseItem* dot = addPoint(p);
     lastPoint = p;
     line->setVisible(isLineVisible);
 
     //record events
+    drawnDots << dot;
     dots << dot;
+    drawnLines << line;
     lines << line;
-    events << MouseEvent(MouseEvent::Move, p, evt->timestamp());
+    events << MouseEvent(MouseEvent::Move, p, evt->timestamp(), dot, line);
 }
 
 
@@ -86,42 +90,67 @@ void Scribbler::mouseReleaseEvent(QMouseEvent *evt) {
 
     QPointF p = mapToScene(evt->pos());
 
-    events << MouseEvent(MouseEvent::Release, p, evt->timestamp());
+    events << MouseEvent(MouseEvent::Release, p, evt->timestamp(), NULL, NULL);
+}
+
+void Scribbler::showLines(bool areLinesShown) {
+    //visibility of existing
+    for (int iLine=0; iLine < drawnLines.length(); ++iLine) {
+        drawnLines[iLine]->setVisible(areLinesShown);
+        //visibility of future drawing
+        isLineVisible = areLinesShown;
+    }
 }
 
 void Scribbler::showLineSegmentsSlot() {
-    //visibility of existing
-    for (int iLine=0; iLine < lines.length(); ++iLine)
-        lines[iLine]->setVisible(true);
-    //visibility of future drawing
-    isLineVisible = true;
+    showLines(true);
 }
 
 void Scribbler::showDotsOnlySlot() {
-    //visibility of existing
-    for (int iLine=0; iLine < lines.length(); ++iLine)
-        lines[iLine]->setVisible(false);
-    //visibility of future drawing
-    isLineVisible = false;
+    showLines(false);
 }
 
 void Scribbler::startCaptureSlot() {
     //reset all the data to being capturing
     events.clear();
+    dots.clear();
+    lines.clear();
 }
 
 void Scribbler::endCaptureSlot() {
-    //loop through events and make a qlist of graphicspointers.. when sent out (emit) take all graphics items and create a group
+    capturedDots << dots;
+    capturedLines << lines;
+    dots.clear();
+    lines.clear();
 
-    //groups qlist of that ^, then can set opacity of that group
     emit sendCapture(events); //emit signal with the data out to MainWindow
     events.clear();
 }
 
 void Scribbler::resetDrawingSlot() {
     scene.clear();
+    dots.clear();
+    lines.clear();
+    drawnLines.clear();
+    drawnDots.clear();
+    capturedDots.clear();
+    capturedLines.clear();
 }
 
+void Scribbler::fadeTab(int selectedTab) {
+    if (selectedTab == -1) return;
+    //set all graphics to .25 opacity
+    for (int iLine=0; iLine < drawnLines.size(); ++iLine)
+        drawnLines[iLine]->setOpacity(0.25);
+    for (int iDot=0; iDot < drawnDots.size(); ++iDot)
+        drawnDots[iDot]->setOpacity(0.25);
+
+    //set all graphics of whichever tab you are on to 1 opacity
+    for (int iLine=0; iLine < capturedLines[selectedTab].size(); ++iLine)
+        capturedLines[selectedTab][iLine]->setOpacity(1.0);
+    for (int iDot=0; iDot < capturedDots[selectedTab].size(); ++iDot)
+        capturedDots[selectedTab][iDot]->setOpacity(1.0);
+}
 
 /*
     QGraphicsLineItem *line = scene.addLine(QLineF(0.0, 0.0, 50.0, 100.0), QPen(Qt::green, 25.0, Qt::SolidLine, Qt::RoundCap));

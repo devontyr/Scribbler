@@ -44,8 +44,8 @@ class Scribbler : public QGraphicsView
     QList<QList<QGraphicsLineItem *>> capturedLines;
     QList<QList<QGraphicsEllipseItem *>> capturedDots;
 
-    QGraphicsEllipseItem * addPoint(QPointF point);
-    QGraphicsLineItem * addLineSegement(QPointF point1, QPointF point2);
+    void addPoint(QPointF p, ulong timestamp);
+    void addLineSegement(QPointF point1, QPointF point2, ulong timestamp);
 
     void showLines (bool areLinesShown);
 

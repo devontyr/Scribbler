@@ -203,10 +203,10 @@ void MainWindow::openFileSlot() {
     lastDir = QFileInfo(inFile).absolutePath();
 
     QDataStream in(&inFile);
-    in >> importedEvents;
+    in >> import;
 
-    for (int iTab=0; iTab<importedEvents.size(); ++iTab) {
-        createTab(iTab);
-        scribbler->drawMouseEvents(importedEvents[iTab]);
+    for (int iTab=0; iTab<import.size(); ++iTab) {
+        scribbler->drawMouseEvents(import[iTab]);
+        scribbler->endCaptureSlot();
     }
 }

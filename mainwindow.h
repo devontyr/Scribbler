@@ -18,6 +18,7 @@ class MainWindow : public QMainWindow
     QList<QGraphicsLineItem*> highlightedLines;
 
     QList<QList<MouseEvent>> importedEvents;
+    QList<QList<MouseEvent>> import;
 
     void createTab(int captureNum);
     void pointsDistance(QPointF p1, QPointF p2);

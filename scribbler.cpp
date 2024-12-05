@@ -28,28 +28,40 @@ Scribbler::Scribbler()
     scene.addRect(sceneRect()); //for debugging
 }
 
-QGraphicsEllipseItem * Scribbler::addPoint(QPointF point) {
-    return scene.addEllipse(QRectF(point - QPointF(0.5*lineWidth, 0.5*lineWidth), QSizeF(lineWidth, lineWidth)), Qt::NoPen, Qt::black);
+void Scribbler::addPoint(QPointF p, ulong timestamp) {
+    QGraphicsEllipseItem* dot = scene.addEllipse(QRectF(p - QPointF(0.5*lineWidth, 0.5*lineWidth), QSizeF(lineWidth, lineWidth)), Qt::NoPen, Qt::black);
+
+    lastPoint = p;
+
+    //record events
+    drawnDots << dot;
+    dots << dot;
+    events << MouseEvent(MouseEvent::Press, p, timestamp, dot, NULL);
 }
 
-QGraphicsLineItem * Scribbler::addLineSegement(QPointF point1, QPointF point2) {
-    return scene.addLine(QLineF(point1, point2), QPen(Qt::black, lineWidth, Qt::SolidLine, Qt::FlatCap));
+void Scribbler::addLineSegement(QPointF point1, QPointF point2, ulong timestamp) {
+    QGraphicsLineItem* line = scene.addLine(QLineF(point1, point2), QPen(Qt::black, lineWidth, Qt::SolidLine, Qt::FlatCap));
+    QGraphicsEllipseItem* dot = scene.addEllipse(QRectF(point2 - QPointF(0.5*lineWidth, 0.5*lineWidth), QSizeF(lineWidth, lineWidth)), Qt::NoPen, Qt::black);
+    lastPoint = point2;
+    line->setVisible(isLineVisible);
+
+    //record events
+    drawnDots << dot;
+    dots << dot;
+    drawnLines << line;
+    lines << line;
+    events << MouseEvent(MouseEvent::Move, point2, timestamp, dot, line);
 }
 
 void Scribbler::drawMouseEvents(QList<MouseEvent> &events) {
-    QPointF lastP; //keep its own last point
-
     for (int iEvt=0; iEvt<events.size(); ++iEvt) {
         QPointF p = events[iEvt].pos;
         int evtAction = events[iEvt].action;
         if (evtAction == 0) {
-            addPoint(p);
-            lastP = p;
+            addPoint(p, events[iEvt].time);
         }
         if (evtAction == 1) {
-            addLineSegement(lastP, p);
-            addPoint(p);
-            lastP = p;
+            addLineSegement(lastPoint, p, events[iEvt].time);
         }
     }
 }
@@ -58,30 +70,17 @@ void Scribbler::mousePressEvent(QMouseEvent *evt) {
     QGraphicsView::mousePressEvent(evt); // need to load previous abilites too... those that we didn't override
 
     QPointF p = mapToScene(evt->pos()); //evt pos is in widget coords (QPoint)... we want SCENE coords (QPointF)
-    QGraphicsEllipseItem* dot = addPoint(p);
-    lastPoint = p; //is it bad this is after addPoint?
-
-    //record events
-    drawnDots << dot;
-    dots << dot;
-    events << MouseEvent(MouseEvent::Press, p, evt->timestamp(), dot, NULL);
+    addPoint(p, evt->timestamp());
 }
 
 void Scribbler::mouseMoveEvent(QMouseEvent *evt) {
     QGraphicsView::mouseMoveEvent(evt);
 
     QPointF p = mapToScene(evt->pos());
-    QGraphicsLineItem* line = addLineSegement(lastPoint, p);
-    QGraphicsEllipseItem* dot = addPoint(p);
-    lastPoint = p;
-    line->setVisible(isLineVisible);
 
-    //record events
-    drawnDots << dot;
-    dots << dot;
-    drawnLines << line;
-    lines << line;
-    events << MouseEvent(MouseEvent::Move, p, evt->timestamp(), dot, line);
+    addLineSegement(lastPoint, p, evt->timestamp());
+    addPoint(p, evt->timestamp());
+
 }
 
 
@@ -151,25 +150,3 @@ void Scribbler::fadeTab(int selectedTab) {
     for (int iDot=0; iDot < capturedDots[selectedTab].size(); ++iDot)
         capturedDots[selectedTab][iDot]->setOpacity(1.0);
 }
-
-/*
-    QGraphicsLineItem *line = scene.addLine(QLineF(0.0, 0.0, 50.0, 100.0), QPen(Qt::green, 25.0, Qt::SolidLine, Qt::RoundCap));
-    QGraphicsLineItem *line1 = scene.addLine(QLineF(0.0, 0.0, 50.0, 100.0), QPen(Qt::black, 2.0));
-    //QGraphicsLineItem *line = new QGraphicsLineItem(QLineF(QPointF(0.0, 0.0), QPointF(100.0, 100.0)));
-    //scene.addItem(line);
-
-    QGraphicsRectItem *rect = scene.addRect(QRectF(100.0, 100.0, 200.0, 300.0), QPen(Qt::red, 5.0, Qt::SolidLine, Qt::SquareCap, Qt::RoundJoin), Qt::yellow);
-    QGraphicsEllipseItem *dot = scene.addEllipse(200.0 - 3.0, 250.0 - 3.0, 6.0, 6.0, Qt::NoPen, Qt::black);
-    rect->setRotation(90.0);
-    rect->setScale(0.5);
-    rect->setTransformOriginPoint(200.0, 250.0);
-
-
-    //GROUP ITEMS
-    QGraphicsItemGroup *group = scene.createItemGroup(QList<QGraphicsItem *>() << line << line1 << rect << dot);
-
-    //TRANSFORMATIONS AND COORDINATES
-    group->setFlag(QGraphicsItem::ItemIsMovable);
-    // group->setTransformOriginPoint(0.0, 0.0);
-    group->setTransform(QTransform().translate(200.0, 200.0).scale(0.5, 0.5).rotate(90.0));
-    */

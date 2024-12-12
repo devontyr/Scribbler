@@ -76,7 +76,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow() {
     QSettings settings("DRT", "scribbler");
-    settings.value("lastDirectory", lastDir);
+    settings.setValue("lastDirectory", lastDir);
 }
 
 void MainWindow::createTab(int captureNum) {
